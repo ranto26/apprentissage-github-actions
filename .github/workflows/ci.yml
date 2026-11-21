@@ -17,5 +17,5 @@ jobs:
       - name: Vérifier Python
         run: python3 --version
 
-      - name: Provoquer une erreur
+      - name: Tester la sortie vide
         run: exit 0
