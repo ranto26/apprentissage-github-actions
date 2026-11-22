@@ -72,5 +72,5 @@ jobs:
 
       - name: Afficher la branche
         env:
-          BRANCHE: ${{ github.ref_name }}
+          BRANCHE: ${{ github.head_ref }}
         run: echo "$BRANCHE"
