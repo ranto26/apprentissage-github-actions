@@ -1,6 +1,3 @@
-import os
-
-
 def normalize_values(values):
     """Normalise une liste de nombres entre 0 et 1."""
     if not values:

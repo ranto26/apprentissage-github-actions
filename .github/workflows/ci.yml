@@ -50,3 +50,27 @@ jobs:
 
       - name: Exécuter pytest
         run: python -m pytest -v
+
+  information:
+    name: Information
+    runs-on: ubuntu-latest
+    needs:
+      - lint
+      - tests
+
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@v4
+
+      - name: Installer Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Afficher la version de Python
+        run: python3 --version
+
+      - name: Afficher la branche
+        env:
+          BRANCHE: ${{ github.ref_name }}
+        run: echo "$BRANCHE"
