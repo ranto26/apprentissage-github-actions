@@ -15,3 +15,11 @@ def normalize_values(values):
 def remove_missing_values(values):
     """Supprime les valeurs None d'une liste."""
     return [value for value in values if value is not None]
+
+
+def calculate_mean(values):
+    """Calcule la moyenne d'une liste de nombres."""
+    if not values:
+        raise ValueError("La liste ne peut pas être vide")
+
+    return sum(values) / len(values)
