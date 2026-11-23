@@ -15,6 +15,7 @@ def normalize_values(values):
 def remove_missing_values(values):
     return values
 
+
 def calculate_mean(values):
     """Calcule la moyenne d'une liste de nombres."""
     if not values:
