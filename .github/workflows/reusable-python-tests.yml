@@ -7,6 +7,12 @@ on:
         description: Version de Python
         required: true
         type: string
+      
+      coverage-threshold:
+        description: Seuil minimal de couverture
+        required: false
+        type: number
+        default: 80
 
 permissions:
   contents: read
@@ -34,7 +40,7 @@ jobs:
 
       - name: Executer les tests et mesurer la couverture
         run: |
-          python -m pytest --cov-report=html
+          python -m pytest --cov-report=html --cov-fail-under=${{ inputs.coverage-threshold }}
 
       - name: Conserver le rapport de couverture
         if: ${{ !cancelled() }}

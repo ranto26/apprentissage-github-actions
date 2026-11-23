@@ -45,11 +45,13 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.11", "3.12", "3.13"]
+        coverage-threshold: [80, 90, 95]
 
     uses: ./.github/workflows/reusable-python-tests.yml
 
     with:
       python-version: ${{ matrix.python-version }}
+      coverage-threshold: ${{ matrix.coverage-threshold }}
 
   evaluation:
     name: Evaluation Data Science
