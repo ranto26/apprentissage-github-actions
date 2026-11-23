@@ -1,6 +1,6 @@
 import pytest
 
-from src.preprocessing import normalize_values, remove_missing_values, calculate_mean
+from src.preprocessing import calculate_mean, normalize_values, remove_missing_values
 
 
 @pytest.mark.parametrize(
