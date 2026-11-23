@@ -58,7 +58,7 @@ jobs:
 
     steps:
       - name: Afficher le projet
-        run: echo run "Projet valide : $PROJECT_NAME"
+        run: 'echo run "Projet valide : $PROJECT_NAME"'
 
       - name: Confirmer la reussite
         run: echo "Lint et tests reussis"
