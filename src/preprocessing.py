@@ -13,4 +13,5 @@ def normalize_values(values):
 
 
 def remove_missing_values(values):
-    return values
+    """Supprime les valeurs None d'une liste."""
+    return [value for value in values if value is not None]
