@@ -39,7 +39,7 @@ jobs:
         run: python -m ruff format --check .
 
   tests:
-    name: Tests Python ${{ matrix.python-version }}
+    name: Tests Python ${{ matrix.python-version }} avec un seuil de ${{ matrix.coverage-threshold}}%
 
     strategy:
       fail-fast: false
