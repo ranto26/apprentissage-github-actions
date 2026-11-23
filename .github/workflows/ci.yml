@@ -51,9 +51,31 @@ jobs:
     with:
       python-version: ${{ matrix.python-version }}
 
+  evaluation:
+    name: Evaluation Data Science
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Recuperer le code
+        uses: actions/checkout@v4
+
+      - name: Installer Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Calculer la metrique
+        run: python scripts/evaluate.py
+
+      - name: Conserver la metrique
+        uses: actions/upload-artifact@v4
+        with:
+          name: metriques-datascience
+          path: metrics.txt
+
   validation:
     name: Validation CI
-    needs: [lint, tests]
+    needs: [lint, tests, evaluation]
     runs-on: ubuntu-latest
 
     steps:
