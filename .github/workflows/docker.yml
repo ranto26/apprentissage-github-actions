@@ -1,0 +1,146 @@
+name: Docker CI
+
+on:
+  push:
+    branches: [main]
+
+  pull_request:
+    branches: [main]
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  docker-test:
+    name: Build et tests Docker
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v4
+
+      - name: Configurer Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Construire l'image avec cache
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: true
+          tags: iris-api:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Démarrer le conteneur
+        run: |
+          docker run -d \
+            --name iris-api-test \
+            -p 8000:8000 \
+            iris-api:ci
+
+      - name: Attendre que l'API réponde
+        run: |
+          python - <<'PY'
+          import time
+          import urllib.request
+
+          for attempt in range(30):
+              try:
+                  with urllib.request.urlopen(
+                      "http://localhost:8000/health",
+                      timeout=2,
+                  ) as response:
+                      if response.status == 200:
+                          print("API disponible")
+                          break
+              except Exception:
+                  time.sleep(2)
+          else:
+              raise SystemExit("API indisponible")
+          PY
+
+      - name: Tester une prédiction
+        run: |
+          python - <<'PY'
+          import json
+          import urllib.request
+
+          payload = {
+              "sepal_length": 5.1,
+              "sepal_width": 3.5,
+              "petal_length": 1.4,
+              "petal_width": 0.2,
+          }
+
+          request = urllib.request.Request(
+              "http://localhost:8000/predict",
+              data=json.dumps(payload).encode(),
+              headers={"Content-Type": "application/json"},
+              method="POST",
+          )
+
+          with urllib.request.urlopen(request) as response:
+              result = json.load(response)
+
+          assert result["species"] == "setosa", result
+          print("Prediction valide :", result)
+          PY
+
+      - name: Afficher les logs en cas d'échec
+        if: ${{ failure() }}
+        run: docker logs iris-api-test
+
+      - name: Arrêter le conteneur
+        if: ${{ !cancelled() }}
+        run: |
+          docker rm -f iris-api-test || true
+
+  publish:
+    name: Publier dans GHCR
+    needs: docker-test
+
+    if: >-
+      ${{ github.event_name == 'push'
+          && github.ref == 'refs/heads/main' }}
+
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v4
+
+      - name: Configurer Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Connexion à GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Générer les tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=raw,value=latest
+            type=sha
+
+      - name: Construire et publier
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
