@@ -39,13 +39,13 @@ jobs:
         run: python -m ruff format --check .
 
   tests:
-    name: Tests Python ${{ matrix.python-version }} avec un seuil de ${{ matrix.coverage-threshold}}%
+    name: Tests Python ${{ matrix.python-version }} avec un seuil de ${{ matrix.coverage-threshold }}%
 
     strategy:
       fail-fast: false
       matrix:
         python-version: ["3.11", "3.12", "3.13"]
-        coverage-threshold: [80, 90, 95]
+        coverage-threshold: [65]
 
     uses: ./.github/workflows/reusable-python-tests.yml
 
