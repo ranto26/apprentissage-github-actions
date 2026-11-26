@@ -1,4 +1,4 @@
-name: CI Python Avancee
+name: CI Python et MLOps
 
 on:
   push:
@@ -39,50 +39,41 @@ jobs:
         run: python -m ruff format --check .
 
   tests:
-    name: Tests Python ${{ matrix.python-version }} avec un seuil de ${{ matrix.coverage-threshold }}%
+    name: Tests Python ${{ matrix.python-version }}
 
     strategy:
       fail-fast: false
       matrix:
         python-version: ["3.11", "3.12", "3.13"]
-        coverage-threshold: [65]
 
     uses: ./.github/workflows/reusable-python-tests.yml
 
     with:
       python-version: ${{ matrix.python-version }}
-      coverage-threshold: ${{ matrix.coverage-threshold }}
 
-  evaluation:
-    name: Evaluation Data Science
-    runs-on: ubuntu-latest
+  docker:
+    name: Docker et validation MLOps
+    needs: [lint, tests]
 
-    steps:
-      - name: Recuperer le code
-        uses: actions/checkout@v4
+    permissions:
+      contents: read
+      packages: write
 
-      - name: Installer Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Calculer la metrique
-        run: python scripts/evaluate.py
-
-      - name: Conserver la metrique
-        uses: actions/upload-artifact@v4
-        with:
-          name: metriques-datascience
-          path: metrics.txt
+    uses: ./.github/workflows/docker.yml
 
   validation:
-    name: Validation CI
-    needs: [lint, tests, evaluation]
+    name: Validation globale CI/CD
+    needs: [lint, tests, docker]
     runs-on: ubuntu-latest
 
     steps:
       - name: Afficher le projet
-        run: 'echo run "Projet valide : $PROJECT_NAME"'
+        run: |
+          echo "Projet valide : $PROJECT_NAME"
 
       - name: Confirmer la reussite
-        run: echo "Lint et tests reussis"
+        run: |
+          echo "Qualite du code validee"
+          echo "Tests Python reussis"
+          echo "Image Docker validee"
+          echo "Performances du modele validees"

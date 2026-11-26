@@ -11,3 +11,5 @@ htmlcov
 tests
 models
 *.pyc
+models/
+reports/

@@ -1,24 +1,25 @@
-name: Docker CI
+name: Docker MLOps
 
 on:
-  push:
-    branches: [main]
-
-  pull_request:
-    branches: [main]
-
-  workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
 
 jobs:
   docker-test:
-    name: Build et tests Docker
+    name: Build, tests et evaluation ML
     runs-on: ubuntu-latest
 
+    permissions:
+      contents: read
+      packages: write
+
+    env:
+      MIN_ACCURACY: ${{ vars.MIN_ACCURACY || '0.90' }}
+
     steps:
-      - name: Récupérer le code
+      - name: Recuperer le code
         uses: actions/checkout@v4
 
       - name: Configurer Docker Buildx
@@ -34,14 +35,14 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Démarrer le conteneur
+      - name: Demarrer le conteneur
         run: |
           docker run -d \
             --name iris-api-test \
             -p 8000:8000 \
             iris-api:ci
 
-      - name: Attendre que l'API réponde
+      - name: Attendre que l'API reponde
         run: |
           python - <<'PY'
           import time
@@ -62,7 +63,7 @@ jobs:
               raise SystemExit("API indisponible")
           PY
 
-      - name: Tester une prédiction
+      - name: Tester une prediction
         run: |
           python - <<'PY'
           import json
@@ -89,58 +90,103 @@ jobs:
           print("Prediction valide :", result)
           PY
 
-      - name: Afficher les logs en cas d'échec
-        if: ${{ failure() }}
-        run: docker logs iris-api-test
+      - name: Evaluer les performances du modele
+        id: evaluation
+        run: |
+          docker exec \
+            -e MIN_ACCURACY="$MIN_ACCURACY" \
+            iris-api-test \
+            python -m src.evaluate
 
-      - name: Arrêter le conteneur
+      - name: Recuperer les metriques
         if: ${{ !cancelled() }}
         run: |
-          docker rm -f iris-api-test || true
+          mkdir -p reports
 
-  publish:
-    name: Publier dans GHCR
-    needs: docker-test
+          if docker cp \
+            iris-api-test:/app/reports/metrics.json \
+            reports/metrics.json; then
+            echo "Rapport recupere"
+          else
+            echo "::warning::Rapport indisponible"
+          fi
 
-    if: >-
-      ${{ github.event_name == 'push'
-          && github.ref == 'refs/heads/main' }}
+      - name: Publier les metriques
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: model-metrics
+          path: reports/metrics.json
+          if-no-files-found: warn
+          retention-days: 14
 
-    runs-on: ubuntu-latest
+      - name: Verifier la presence du rapport
+        run: test -s reports/metrics.json
 
-    permissions:
-      contents: read
-      packages: write
+      - name: Afficher le resume des metriques
+        if: ${{ !cancelled() }}
+        run: |
+          if [ -f reports/metrics.json ]; then
+            python - <<'PY'
+          import json
+          import os
 
-    steps:
-      - name: Récupérer le code
-        uses: actions/checkout@v4
+          with open("reports/metrics.json", encoding="utf-8") as file:
+              metrics = json.load(file)
 
-      - name: Configurer Buildx
-        uses: docker/setup-buildx-action@v3
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as summary:
+              summary.write("## Performances du modele Iris\n\n")
+              summary.write("| Metrique | Valeur |\n")
+              summary.write("|---|---:|\n")
 
-      - name: Connexion à GHCR
+              for name, value in metrics.items():
+                  summary.write(f"| {name} | {value:.2%} |\n")
+          PY
+          fi
+
+      - name: Afficher les logs en cas d'echec
+        if: ${{ failure() }}
+        run: docker logs iris-api-test || true
+
+      - name: Arreter le conteneur
+        if: ${{ !cancelled() }}
+        run: docker rm -f iris-api-test || true
+
+      - name: Connexion a GHCR
+        if: >-
+          ${{ success()
+              && github.event_name == 'push'
+              && github.ref == 'refs/heads/main' }}
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Générer les tags
+      - name: Generer les tags Docker
         id: meta
+        if: >-
+          ${{ success()
+              && github.event_name == 'push'
+              && github.ref == 'refs/heads/main' }}
         uses: docker/metadata-action@v5
         with:
           images: ghcr.io/${{ github.repository }}
           tags: |
             type=raw,value=latest
-            type=sha
+            type=sha,format=long
 
-      - name: Construire et publier
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      - name: Publier l'image validee
+        if: >-
+          ${{ success()
+              && github.event_name == 'push'
+              && github.ref == 'refs/heads/main' }}
+        env:
+          IMAGE_TAGS: ${{ steps.meta.outputs.tags }}
+        run: |
+          while IFS= read -r tag; do
+            [ -n "$tag" ] || continue
+
+            docker tag iris-api:ci "$tag"
+            docker push "$tag"
+          done <<< "$IMAGE_TAGS"
