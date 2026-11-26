@@ -40,10 +40,10 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements-dev.txt
 
-      - name: Entrainer le modele
+      - name: Entrainer le modele pour les tests
         run: python -m src.train
 
-      - name: Executer les tests
+      - name: Executer les tests et mesurer la couverture
         run: python -m pytest --cov-report=html
 
       - name: Conserver le rapport de couverture
